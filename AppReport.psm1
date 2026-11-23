@@ -562,7 +562,15 @@ function Get-AppReportAccessPolicy {
     [CmdletBinding()]
     param([switch]$ExpandMembers)
     if (-not (Test-ExchangeConnection)) { throw 'Not connected to Exchange Online (Connect-AppReport -Exchange).' }
-    foreach ($p in @(Get-ApplicationAccessPolicy -ErrorAction Stop)) {
+    # Tenants without any policy return a "not found" error for the container search ('...\*') instead of an empty result
+    $policies = @()
+    try { $policies = @(Get-ApplicationAccessPolicy -ErrorAction Stop) }
+    catch {
+        if ([string]$_.CategoryInfo.Reason -match 'NotFound' -or $_.Exception.Message -match 'Microsoft Exchange Hosted Organizations,.*\\\*') {
+            Write-Verbose 'No Application Access Policies in this tenant.'
+        } else { throw }
+    }
+    foreach ($p in $policies) {
         $scopeId = [string]$p.ScopeIdentity
         $recip = $null
         $raw = Get-AppReportProp $p 'ScopeIdentityRaw'
